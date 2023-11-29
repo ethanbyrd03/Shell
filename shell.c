@@ -83,6 +83,7 @@ void cleanup(command_t* p_cmd) {
         }
     free(p_cmd->argv);
     p_cmd->argv = NULL;
+    }
 } // end cleanup function
 
 /* ------------------------------------------------------------------------------
