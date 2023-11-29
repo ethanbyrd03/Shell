@@ -1,4 +1,4 @@
-// PID: 9DigitPidNoSpacesOrDashes
+// PID: 730481481
 // I pledge the COMP211 honor code.
 
 // ----------------------------------------------
@@ -46,9 +46,17 @@ const char* BUILT_IN_COMMANDS[] = { "cd", "exit", NULL };
  *      None
  */
 void alloc_mem_for_command(command_t* p_cmd, int argc) {
-
-    // TODO: COMPLETE YOUR CODE HERE.
-
+    p_cmd->argv = (char**)malloc((argc+1) * sizeof(char*));
+    if (p_cmd->argv == NULL) {
+        exit(ERROR);
+    }
+    for(int i = 0; i < argc; i++) {
+        p_cmd->argv[i] = (char*)malloc(MAX_ARG_LEN * sizeof(char));
+        if (p_cmd->argv[i] == NULL) {
+            exit(ERROR);
+        }   
+    }
+    p_cmd->argv[argc] = NULL;
 } // end alloc_mem_for_command function
 
 /* ------------------------------------------------------------------------------
@@ -68,9 +76,13 @@ void alloc_mem_for_command(command_t* p_cmd, int argc) {
  *
  */
 void cleanup(command_t* p_cmd) {
-
-    // TODO: COMPLETE YOUR CODE HERE.
-
+    if (p_cmd->argv != NULL) {
+        for (int i = 0; p_cmd->argv[i] != NULL; i++) {
+            free(p_cmd->argv[i]);
+            p_cmd->argv[i] = NULL;
+        }
+    free(p_cmd->argv);
+    p_cmd->argv = NULL;
 } // end cleanup function
 
 /* ------------------------------------------------------------------------------
