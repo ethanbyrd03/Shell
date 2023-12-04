@@ -46,6 +46,7 @@ const char* BUILT_IN_COMMANDS[] = { "cd", "exit", NULL };
  *      None
  */
 void alloc_mem_for_command(command_t* p_cmd, int argc) {
+    p_cmd->argc = argc;
     p_cmd->argv = (char**)malloc((argc+1) * sizeof(char*));
     if (p_cmd->argv == NULL) {
         exit(ERROR);
@@ -77,7 +78,7 @@ void alloc_mem_for_command(command_t* p_cmd, int argc) {
  */
 void cleanup(command_t* p_cmd) {
     if (p_cmd->argv != NULL) {
-        for (int i = 0; i < p_cmd->argc; i++) {
+        for (int i = 0; i < p_cmd->argc + 1; i++) {
             free(p_cmd->argv[i]);
             p_cmd->argv[i] = NULL;
         }
@@ -133,24 +134,19 @@ void cleanup(command_t* p_cmd) {
  *
  */
 void parse(char* line, command_t* p_cmd) {
-    while (*line == ' ') {
-        line++;
-    }
     int argc = 0;
     char *token = strtok(line, " ");
-    alloc_mem_for_command(p_cmd, 0);
+    char copy[MAX_ARG_LEN];
+    strcpy(copy, line);
     while (token != NULL) {
-        p_cmd->argv = (char **)realloc(p_cmd->argv, (argc + 1) * sizeof(char *));
-        if (p_cmd->argv == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            exit(EXIT_FAILURE);
-        }
-        p_cmd->argv[argc] = strdup(token);
-        token = strtok(NULL, " ");
         argc++;
+        token = strtok(NULL, " ");
     }
-    p_cmd->argv[argc] = NULL;
-    p_cmd->argc = argc;    
+    alloc_mem_for_command(p_cmd, argc);
+    char* token2 = strtok(copy, " ");
+    for (int i = 0; i< argc; i++) {
+        strcpy(p_cmd->argv[i], token2);
+        token2 = strtok(NULL, " ");}    
 } // end parse function
 
 /* ------------------------------------------------------------------------------
@@ -193,28 +189,22 @@ void parse(char* line, command_t* p_cmd) {
  */
 bool find_fullpath(command_t* p_cmd) {
     
-    char *path_env_variable = getenv("PATH");
-    printf("PATH = %s\n", path_env_variable);
-    if (path_env_variable == NULL) {
-        fprintf(stderr, "PATH environment variable not found\n");
-        return false;
-    }
+    char *path_env_variable[MAX_ARG_LEN];
+    strcpy(path_env_variable, getenv("PATH"));
     char *path_token = strtok(path_env_variable, PATH_SEPARATOR);
     
     while (path_token != NULL) {
-        char full_path[256];
-        snprintf(full_path, sizeof(full_path), "%s/%s", path_token, p_cmd->argv[0]);
-        printf("Checking path: %s\n", full_path);
-        struct stat file_stat;
-        if (stat(full_path, &file_stat) == 0 && file_stat.st_mode & S_IXUSR) {
-             printf("Executable found: %s\n", p_cmd->argv[0]);
-            free(p_cmd->argv[0]);
-             p_cmd->argv[0] = strdup(full_path);
-            return true;
-        } else {perror("stat");}
+        char full_path[MAX_ARG_LEN];
+        strcpy(full_path, path_token);
+        strcat(full_path, "/");
+        strcat(full_path, p_cmd->argv[0]);
+        struct stat buf;
+        if (stat(full_path, &buf) == 0 && (S_IFREG & buf.st_mode)) {
+            strcpy(p_cmd->argv[0], full_path);
+            return true;        
+        }
         path_token = strtok(NULL, PATH_SEPARATOR);
     }
-
     return false;
 } // end find_fullpath function
 
@@ -234,37 +224,23 @@ bool find_fullpath(command_t* p_cmd) {
  *
  */
 int execute(command_t* p_cmd) {
-    char *original_path = getenv("PATH");
-    char *original_path_dup = strdup(original_path);
+    int status = SUCCESS;
+    int child_process_status;
+    pid_t child_pid;
+
     if (is_builtin(p_cmd)) { 
-        if (do_builtin(p_cmd) == SUCCESS) {
-            original_path = original_path_dup;
-            return SUCCESS;
-        }
+        return do_builtin(p_cmd);
     }
     if (find_fullpath(p_cmd)) {
-        pid_t pid = fork();
-
-        if (pid == -1) {
-            perror("fork");
-            original_path = original_path_dup;
-            return ERROR;
-        } else if (pid == 0) {
-            original_path = original_path_dup;
-            if (execv(p_cmd->argv[0], p_cmd->argv) == -1) {
-            perror("execv");
-            exit(EXIT_FAILURE);}
-        } else {
-            int status;
-            waitpid(pid, &status, 0);
-            original_path = original_path_dup;
-            return WIFEXITED(status) ? WEXITSTATUS(status) : ERROR;
+        if (fork() == 0) {
+            execv(p_cmd->argv[0], p_cmd->argv);
+            exit(-1);
         }
+        child_pid = wait(&child_process_status);
     } else {
-        fprintf(stderr, "Command '%s' not found!\n", p_cmd->argv[0]);
-        original_path = original_path_dup;
-        return ERROR;
-    }
+        printf("Command '%s' not found!\n", p_cmd->argv[0]);
+    }return status;
+   
 } // end execute function
 
 /* ------------------------------------------------------------------------------
