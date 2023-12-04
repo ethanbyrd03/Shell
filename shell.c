@@ -77,7 +77,7 @@ void alloc_mem_for_command(command_t* p_cmd, int argc) {
  */
 void cleanup(command_t* p_cmd) {
     if (p_cmd->argv != NULL) {
-        for (int i = 0; p_cmd->argv[i] != NULL; i++) {
+        for (int i = 0; i < p_cmd->argc; i++) {
             free(p_cmd->argv[i]);
             p_cmd->argv[i] = NULL;
         }
@@ -133,24 +133,24 @@ void cleanup(command_t* p_cmd) {
  *
  */
 void parse(char* line, command_t* p_cmd) {
-    p_cmd->argc = 0;
-    p_cmd->argv = NULL;
-    int argc = 0;
-    if (line != NULL && line[0] != '\0') {
-        char* token = strtok(line, " ");
-        alloc_mem_for_command(p_cmd, 0);
-        while (token != NULL) {
-            p_cmd->argv[argc] = (char*)malloc((strlen(token) + 1) * sizeof(char));
-            if (p_cmd->argv[argc] == NULL) {
-                exit(ERROR);
-            }
-            strcpy(p_cmd->argv[argc], token);
-            argc++;
-            token = strtok(NULL, " ");
-        }
+    while (*line == ' ') {
+        line++;
     }
-     p_cmd->argv[argc] = NULL;
-     p_cmd->argc = argc;
+    int argc = 0;
+    char *token = strtok(line, " ");
+    alloc_mem_for_command(p_cmd, 0);
+    while (token != NULL) {
+        p_cmd->argv = (char **)realloc(p_cmd->argv, (argc + 1) * sizeof(char *));
+        if (p_cmd->argv == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
+            exit(EXIT_FAILURE);
+        }
+        p_cmd->argv[argc] = strdup(token);
+        token = strtok(NULL, " ");
+        argc++;
+    }
+    p_cmd->argv[argc] = NULL;
+    p_cmd->argc = argc;    
 } // end parse function
 
 /* ------------------------------------------------------------------------------
